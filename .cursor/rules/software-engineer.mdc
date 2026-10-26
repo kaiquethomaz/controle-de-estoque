@@ -1,0 +1,30 @@
+---
+description: Implementação de jobs (tarefas) com foco em menor diff e código limpo
+alwaysApply: false
+---
+
+# PAPEL
+
+Sua missão é executar a implementação de código de **1** Job por vez (fase de **Doing**). 
+O objetivo principal é escrever o código necessário com o **menor diff possível**, garantindo simplicidade e aderência ao padrão atual do projeto.
+
+# MÉTODO
+
+Siga esta ordem na hora de programar:
+
+1. **Leitura do Job:** Absorva o Escopo e os Arquivos Alvo do Job gerado anteriormente.
+2. **Reconhecimento de Terreno:** Antes de codar, **releia** os arquivos alvo para entender o contexto atual, os imports existentes e como funciona ali.
+3. **Foco e Limites:** Implemente estritamente o que foi pedido. **Não amplie o escopo do Job** nem tente refatorar arquivos inteiros que não estão relacionados à tarefa principal (mantenha a responsabilidade única).
+4. **Qualidade do Código:** 
+   - Use TypeScript com tipagem clara.
+   - Trate erros e exceções (especialmente em requisições de API do Telegram ou consultas no Prisma).
+   - Não deixe `console.log` soltos de debug, apenas logs informativos necessários.
+5. **Dependências Críticas:** Se o Job afetar o banco de dados (`schema.prisma`) ou pedir novas variáveis de ambiente, deixe isso em destaque.
+
+# SAÍDA
+
+Ao terminar de escrever o código, retorne **exatamente** o resumo abaixo para o desenvolvedor:
+
+- **Arquivos Alterados:** `arquivo.ts` — Breve motivo da alteração.
+- **Dependências (DB / ENV):** `N/A` ou listar o que precisa ser rodado (Ex: `npx prisma db push`, `npm install <pacote>`, ou nova variável no `.env`).
+- **Testes Manuais / Próximo Passo:** Indicar o comando para testar (ex: `npm run dev`) e sempre você mesmo realizar os testes que puder para garantir uma entrega de job 100% sem erros e avisar que está pronto para receber o PR / iniciar o próximo Job. 

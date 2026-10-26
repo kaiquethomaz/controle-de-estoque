@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estoque de TI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>📦 Estoque de TI</h1>
+    <p>Almoxarifado: entrada, retirada e consulta de materiais</p>
+  </header>
+
+  <main>
+    <div id="aviso" class="aviso" hidden></div>
+
+    <section class="cartao largo">
+      <div class="topo-painel">
+        <h2>Consulta rápida</h2>
+        <div class="resumo">
+          <span id="total-itens" class="selo">0 itens</span>
+          <span id="total-repor" class="selo alerta" hidden></span>
+        </div>
+      </div>
+      <div class="filtros">
+        <input id="busca" type="search" placeholder="🔍 Buscar item (ex: mouse)" autocomplete="off">
+        <select id="filtro-categoria">
+          <option value="">Todas as categorias</option>
+        </select>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Categoria</th><th class="num">Em estoque</th><th class="num">Mínimo</th><th>Situação</th></tr>
+        </thead>
+        <tbody id="lista-itens"></tbody>
+      </table>
+    </section>
+
+    <section class="cartao">
+      <h2>Retirada (saída)</h2>
+      <form id="form-saida">
+        <label>Item
+          <select name="itemId" required></select>
+        </label>
+        <label>Quantidade
+          <input name="quantidade" type="number" min="1" step="1" value="1" required>
+        </label>
+        <label>Quem retirou
+          <input name="responsavel" required placeholder="Ex: Carlos (técnico)">
+        </label>
+        <label>Chamado ou setor
+          <input name="destino" required placeholder="Ex: Chamado #1234 / RH">
+        </label>
+        <button type="submit">Registrar retirada</button>
+      </form>
+    </section>
+
+    <section class="cartao">
+      <h2>Entrada de remessa</h2>
+      <form id="form-entrada">
+        <label>Item
+          <select name="itemId" required></select>
+        </label>
+        <label>Quantidade que chegou
+          <input name="quantidade" type="number" min="1" step="1" required>
+        </label>
+        <button type="submit">Registrar entrada</button>
+      </form>
+    </section>
+
+    <section class="cartao">
+      <h2>Cadastrar item novo</h2>
+      <form id="form-cadastro">
+        <label>Nome
+          <input name="nome" required placeholder="Ex: Cabo de rede 2m">
+        </label>
+        <label>Categoria
+          <input name="categoria" required list="categorias" placeholder="Ex: Cabos">
+          <datalist id="categorias"></datalist>
+        </label>
+        <div class="linha">
+          <label>Quantidade inicial
+            <input name="quantidade" type="number" min="0" step="1" value="0" required>
+          </label>
+          <label>Estoque mínimo
+            <input name="estoqueMinimo" type="number" min="0" step="1" value="0" required>
+          </label>
+        </div>
+        <button type="submit">Cadastrar</button>
+      </form>
+    </section>
+
+    <section class="cartao largo">
+      <h2>Histórico de movimentações</h2>
+      <div class="rolagem">
+        <table>
+          <thead>
+            <tr><th>Data</th><th>Tipo</th><th>Item</th><th class="num">Qtd.</th><th>Quem retirou</th><th>Chamado / setor</th></tr>
+          </thead>
+          <tbody id="lista-historico"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

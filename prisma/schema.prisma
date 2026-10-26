@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Item {
+  id            Int            @id @default(autoincrement())
+  nome          String         @unique
+  categoria     String
+  quantidade    Int            @default(0)
+  estoqueMinimo Int            @default(0)
+  criadoEm      DateTime       @default(now())
+  movimentacoes Movimentacao[]
+}
+
+// tipo: "ENTRADA" ou "SAIDA" (SQLite não tem enum)
+model Movimentacao {
+  id          Int      @id @default(autoincrement())
+  tipo        String
+  quantidade  Int
+  responsavel String?
+  destino     String?
+  data        DateTime @default(now())
+  itemId      Int
+  item        Item     @relation(fields: [itemId], references: [id])
+}
