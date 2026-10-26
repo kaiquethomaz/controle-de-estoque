@@ -11,8 +11,7 @@
     {
       "binding": "DB",
       "database_name": "estoque",
-      // Trocar pelo Database ID criado no painel (Storage & Databases > D1)
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "0df03f39-c90e-4b1f-8aef-27cce587a321"
     }
   ],
   "dev": {
