@@ -10,15 +10,20 @@ Sistema simples para o almoxarifado de TI: entrada de materiais, retirada (quem 
 
 ## Tecnologias
 
-Node.js, TypeScript, Express, Prisma e SQLite. Front-end em HTML/CSS/JS puro.
+Cloudflare Workers + D1 (SQLite), Hono e TypeScript. Front-end em HTML/CSS/JS puro (pasta `public`).
+As tabelas são criadas automaticamente na primeira requisição.
 
-## Como rodar
+## Rodar localmente
 
 ```bash
 npm install
-cp .env.example .env
-npx prisma db push
 npm run dev
 ```
 
-Acesse `http://localhost:3000`.
+Acesse `http://localhost:3000` (o D1 é simulado localmente na pasta `.wrangler`).
+
+## Publicar na Cloudflare
+
+1. No painel: **Storage & Databases → D1 → Create**, com o nome `estoque`.
+2. Copie o **Database ID** para `database_id` em `wrangler.jsonc` e envie para o GitHub.
+3. **Workers & Pages → Create application → Import a repository** e escolha este repositório (o deploy usa `npx wrangler deploy`).

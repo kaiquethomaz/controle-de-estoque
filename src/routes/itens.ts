@@ -1,8 +1,7 @@
-import { Router, type Request, type Response } from "express";
-import { Prisma } from "@prisma/client";
-import { prisma } from "../db.js";
+import { Hono } from "hono";
+import type { Item } from "../db.js";
 
-export const itensRouter = Router();
+export const itensRouter = new Hono<{ Bindings: Env }>();
 
 function inteiro(valor: unknown): number | null {
   const n = Number(valor);
@@ -13,137 +12,131 @@ function texto(valor: unknown): string {
   return typeof valor === "string" ? valor.trim() : "";
 }
 
-// Consulta de itens, com busca opcional por nome (?busca=) e categoria (?categoria=)
-itensRouter.get("/", async (req: Request, res: Response) => {
-  const busca = texto(req.query.busca);
-  const categoria = texto(req.query.categoria);
+type Corpo = Record<string, unknown>;
 
-  try {
-    const itens = await prisma.item.findMany({
-      where: {
-        nome: busca ? { contains: busca } : undefined,
-        categoria: categoria || undefined,
-      },
-      orderBy: { nome: "asc" },
-    });
-    res.json(itens);
-  } catch (erro) {
-    console.error("Erro ao listar itens:", erro);
-    res.status(500).json({ erro: "Erro ao listar itens." });
+// Consulta de itens, com busca opcional por nome (?busca=) e categoria (?categoria=)
+itensRouter.get("/", async (c) => {
+  const busca = texto(c.req.query("busca"));
+  const categoria = texto(c.req.query("categoria"));
+
+  const filtros: string[] = [];
+  const valores: string[] = [];
+  if (busca) {
+    filtros.push("nome LIKE ?");
+    valores.push(`%${busca}%`);
   }
+  if (categoria) {
+    filtros.push("categoria = ?");
+    valores.push(categoria);
+  }
+
+  const where = filtros.length ? `WHERE ${filtros.join(" AND ")}` : "";
+  const { results } = await c.env.DB.prepare(`SELECT * FROM item ${where} ORDER BY nome COLLATE NOCASE`)
+    .bind(...valores)
+    .all<Item>();
+  return c.json(results);
 });
 
 // Cadastro de item novo (com a quantidade inicial registrada como ENTRADA)
-itensRouter.post("/", async (req: Request, res: Response) => {
-  const nome = texto(req.body?.nome);
-  const categoria = texto(req.body?.categoria);
-  const quantidade = inteiro(req.body?.quantidade ?? 0);
-  const estoqueMinimo = inteiro(req.body?.estoqueMinimo ?? 0);
+itensRouter.post("/", async (c) => {
+  const corpo = await c.req.json<Corpo>().catch((): Corpo => ({}));
+  const nome = texto(corpo.nome);
+  const categoria = texto(corpo.categoria);
+  const quantidade = inteiro(corpo.quantidade ?? 0);
+  const estoqueMinimo = inteiro(corpo.estoqueMinimo ?? 0);
 
   if (!nome || !categoria) {
-    return res.status(400).json({ erro: "Informe o nome e a categoria." });
+    return c.json({ erro: "Informe o nome e a categoria." }, 400);
   }
   if (quantidade === null || quantidade < 0) {
-    return res.status(400).json({ erro: "A quantidade inicial deve ser um número inteiro maior ou igual a 0." });
+    return c.json({ erro: "A quantidade inicial deve ser um número inteiro maior ou igual a 0." }, 400);
   }
   if (estoqueMinimo === null || estoqueMinimo < 0) {
-    return res.status(400).json({ erro: "O estoque mínimo deve ser um número inteiro maior ou igual a 0." });
+    return c.json({ erro: "O estoque mínimo deve ser um número inteiro maior ou igual a 0." }, 400);
   }
 
+  const db = c.env.DB;
   try {
-    const item = await prisma.item.create({
-      data: {
-        nome,
-        categoria,
-        quantidade,
-        estoqueMinimo,
-        movimentacoes: quantidade > 0 ? { create: { tipo: "ENTRADA", quantidade } } : undefined,
-      },
-    });
-    res.status(201).json(item);
+    const [criado] = await db.batch([
+      db.prepare("INSERT INTO item (nome, categoria, quantidade, estoqueMinimo) VALUES (?, ?, ?, ?) RETURNING *")
+        .bind(nome, categoria, quantidade, estoqueMinimo),
+      db.prepare("INSERT INTO movimentacao (tipo, quantidade, itemId) SELECT 'ENTRADA', ?1, last_insert_rowid() WHERE ?1 > 0")
+        .bind(quantidade),
+    ]);
+    return c.json(criado.results[0] as Item, 201);
   } catch (erro) {
-    if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2002") {
-      return res.status(409).json({ erro: `Já existe um item chamado "${nome}". Use a entrada para somar quantidade.` });
+    if (String(erro).includes("UNIQUE constraint failed")) {
+      return c.json({ erro: `Já existe um item chamado "${nome}". Use a entrada para somar quantidade.` }, 409);
     }
-    console.error("Erro ao cadastrar item:", erro);
-    res.status(500).json({ erro: "Erro ao cadastrar item." });
+    throw erro;
   }
 });
 
 // Entrada de remessa em um item que já existe
-itensRouter.post("/:id/entrada", async (req: Request, res: Response) => {
-  const id = inteiro(req.params.id);
-  const quantidade = inteiro(req.body?.quantidade);
+itensRouter.post("/:id/entrada", async (c) => {
+  const id = inteiro(c.req.param("id"));
+  const corpo = await c.req.json<Corpo>().catch((): Corpo => ({}));
+  const quantidade = inteiro(corpo.quantidade);
 
   if (id === null) {
-    return res.status(400).json({ erro: "Item inválido." });
+    return c.json({ erro: "Item inválido." }, 400);
   }
   if (quantidade === null || quantidade <= 0) {
-    return res.status(400).json({ erro: "A quantidade deve ser um número inteiro maior que 0." });
+    return c.json({ erro: "A quantidade deve ser um número inteiro maior que 0." }, 400);
   }
 
-  try {
-    const item = await prisma.item.update({
-      where: { id },
-      data: {
-        quantidade: { increment: quantidade },
-        movimentacoes: { create: { tipo: "ENTRADA", quantidade } },
-      },
-    });
-    res.json(item);
-  } catch (erro) {
-    if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === "P2025") {
-      return res.status(404).json({ erro: "Item não encontrado." });
-    }
-    console.error("Erro ao registrar entrada:", erro);
-    res.status(500).json({ erro: "Erro ao registrar entrada." });
+  const db = c.env.DB;
+  const [atualizado] = await db.batch([
+    db.prepare("UPDATE item SET quantidade = quantidade + ?1 WHERE id = ?2 RETURNING *").bind(quantidade, id),
+    db.prepare("INSERT INTO movimentacao (tipo, quantidade, itemId) SELECT 'ENTRADA', ?1, id FROM item WHERE id = ?2")
+      .bind(quantidade, id),
+  ]);
+
+  const item = atualizado.results[0] as Item | undefined;
+  if (!item) {
+    return c.json({ erro: "Item não encontrado." }, 404);
   }
+  return c.json(item);
 });
 
-class ErroSaida extends Error {
-  constructor(public status: number, mensagem: string) {
-    super(mensagem);
-  }
-}
-
 // Saída (requisição): o quê, quem retirou e para qual chamado/setor
-itensRouter.post("/:id/saida", async (req: Request, res: Response) => {
-  const id = inteiro(req.params.id);
-  const quantidade = inteiro(req.body?.quantidade);
-  const responsavel = texto(req.body?.responsavel);
-  const destino = texto(req.body?.destino);
+itensRouter.post("/:id/saida", async (c) => {
+  const id = inteiro(c.req.param("id"));
+  const corpo = await c.req.json<Corpo>().catch((): Corpo => ({}));
+  const quantidade = inteiro(corpo.quantidade);
+  const responsavel = texto(corpo.responsavel);
+  const destino = texto(corpo.destino);
 
   if (id === null) {
-    return res.status(400).json({ erro: "Item inválido." });
+    return c.json({ erro: "Item inválido." }, 400);
   }
   if (quantidade === null || quantidade <= 0) {
-    return res.status(400).json({ erro: "A quantidade deve ser um número inteiro maior que 0." });
+    return c.json({ erro: "A quantidade deve ser um número inteiro maior que 0." }, 400);
   }
   if (!responsavel || !destino) {
-    return res.status(400).json({ erro: "Informe quem retirou e para qual chamado ou setor." });
+    return c.json({ erro: "Informe quem retirou e para qual chamado ou setor." }, 400);
   }
 
-  try {
-    const item = await prisma.$transaction(async (tx) => {
-      // Só desconta se ainda houver saldo suficiente (evita estoque negativo)
-      const { count } = await tx.item.updateMany({
-        where: { id, quantidade: { gte: quantidade } },
-        data: { quantidade: { decrement: quantidade } },
-      });
-      if (count === 0) {
-        const atual = await tx.item.findUnique({ where: { id } });
-        if (!atual) throw new ErroSaida(404, "Item não encontrado.");
-        throw new ErroSaida(400, `Estoque insuficiente: "${atual.nome}" tem só ${atual.quantidade} unidade(s).`);
-      }
-      await tx.movimentacao.create({ data: { tipo: "SAIDA", quantidade, responsavel, destino, itemId: id } });
-      return tx.item.findUniqueOrThrow({ where: { id } });
-    });
-    res.json(item);
-  } catch (erro) {
-    if (erro instanceof ErroSaida) {
-      return res.status(erro.status).json({ erro: erro.message });
-    }
-    console.error("Erro ao registrar saída:", erro);
-    res.status(500).json({ erro: "Erro ao registrar saída." });
+  // Só desconta se ainda houver saldo suficiente (evita estoque negativo);
+  // o histórico só é gravado se o desconto aconteceu (changes() = 1)
+  const db = c.env.DB;
+  const [atualizado] = await db.batch([
+    db.prepare("UPDATE item SET quantidade = quantidade - ?1 WHERE id = ?2 AND quantidade >= ?1 RETURNING *")
+      .bind(quantidade, id),
+    db.prepare(
+      `INSERT INTO movimentacao (tipo, quantidade, responsavel, destino, itemId)
+       SELECT 'SAIDA', ?1, ?2, ?3, ?4 WHERE changes() = 1`
+    ).bind(quantidade, responsavel, destino, id),
+  ]);
+
+  const item = atualizado.results[0] as Item | undefined;
+  if (item) {
+    return c.json(item);
   }
+
+  const atual = await db.prepare("SELECT nome, quantidade FROM item WHERE id = ?").bind(id).first<Item>();
+  if (!atual) {
+    return c.json({ erro: "Item não encontrado." }, 404);
+  }
+  return c.json({ erro: `Estoque insuficiente: "${atual.nome}" tem só ${atual.quantidade} unidade(s).` }, 400);
 });

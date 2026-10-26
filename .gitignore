@@ -1,5 +1,5 @@
 node_modules
-.env
+.wrangler
+.dev.vars
 .claude
-prisma/*.db
-prisma/*.db-journal
+prisma

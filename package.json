@@ -5,26 +5,20 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/server.ts",
-    "start": "tsx --env-file=.env src/server.ts",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
     "build": "tsc --noEmit",
-    "db:push": "prisma db push"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.19.3",
-    "express": "^4.22.3"
+    "types": "wrangler types"
   },
   "devDependencies": {
-    "@types/express": "^4.17.25",
-    "@types/node": "^26.6.5",
-    "prisma": "^6.19.3",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "wrangler": "^4.152.0"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
-    "@prisma/engines@6.19.3": true,
-    "prisma@6.19.3": true,
-    "@prisma/client@6.19.3": true
+    "workerd@1.20261019.1": true
+  },
+  "dependencies": {
+    "hono": "^4.13.14"
   }
 }
